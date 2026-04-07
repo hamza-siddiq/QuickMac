@@ -482,7 +482,7 @@ struct ProcessMonitorView: View {
 
                                     Button("Kill") {
                                         for pid in group.pids {
-                                            _ = QuickMacServices.shared.killProcess(pid: pid)
+                                            _ = QuickBarServices.shared.killProcess(pid: pid)
                                         }
                                         loadProcesses()
                                     }
@@ -519,7 +519,7 @@ struct ProcessMonitorView: View {
     private func loadProcesses() {
         isLoading = true
         DispatchQueue.global(qos: .userInitiated).async {
-            let procs = QuickMacServices.shared.getGroupedProcesses()
+            let procs = QuickBarServices.shared.getGroupedProcesses()
             DispatchQueue.main.async {
                 groups = procs
                 isLoading = false

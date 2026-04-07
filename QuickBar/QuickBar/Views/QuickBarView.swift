@@ -1,9 +1,9 @@
 import SwiftUI
 
-struct QuickMacView: View {
-    let state: QuickMacState
+struct QuickBarView: View {
+    let state: QuickBarState
     let delegate: AppDelegate
-    let services = QuickMacServices.shared
+    let services = QuickBarServices.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,7 +23,7 @@ struct QuickMacView: View {
 
     private var headerSection: some View {
         HStack {
-            Text("QuickMac")
+            Text("QuickBar")
                 .font(.system(size: 14, weight: .semibold))
 
             Spacer()
@@ -117,7 +117,7 @@ struct QuickMacView: View {
         state.refreshMemoryInfo()
     }
 
-    private func handleToolAction(_ tool: QuickMacTool) {
+    private func handleToolAction(_ tool: QuickBarTool) {
         switch tool {
         case .quitAllApps:
             state.lastActionStatus = .inProgress
@@ -262,9 +262,9 @@ struct QuickMacView: View {
 }
 
 struct ToolDropDelegate: DropDelegate {
-    let tool: QuickMacTool
-    let toolOrder: [QuickMacTool]
-    let onReorder: ([QuickMacTool]) -> Void
+    let tool: QuickBarTool
+    let toolOrder: [QuickBarTool]
+    let onReorder: ([QuickBarTool]) -> Void
 
     func performDrop(info: DropInfo) -> Bool {
         true
@@ -278,7 +278,7 @@ struct ToolDropDelegate: DropDelegate {
         if let item = info.itemProviders(for: ["public.plain-text"]).first {
             _ = item.loadObject(ofClass: NSString.self) { (obj, error) in
                 if let raw = obj as? String,
-                   let source = QuickMacTool(rawValue: raw),
+                   let source = QuickBarTool(rawValue: raw),
                    let fromIndex = toolOrder.firstIndex(of: source),
                    let toIndex = toolOrder.firstIndex(of: tool),
                    fromIndex != toIndex {

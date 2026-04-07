@@ -1,12 +1,12 @@
-# QuickMac
+# QuickBar
 
 A lightweight macOS menu bar app that gives you quick access to essential system utilities with a single click.
 
-<img src="Screenshot.png" alt="QuickMac Screenshot" width="640">
+<img src="Screenshot.png" alt="QuickBar Screenshot" width="320">
 
 ## Download
 
-[⬇️ Download QuickMac.dmg](https://github.com/hamza-siddiq/QuickMac/releases)
+[⬇️ Download QuickBar.dmg](https://github.com/hamza-siddiq/QuickBar/releases)
 
 ## Features
 
@@ -25,14 +25,14 @@ A lightweight macOS menu bar app that gives you quick access to essential system
 
 ## Installation
 
-1. Download the latest `QuickMac.dmg`
+1. Download the latest `QuickBar.dmg`
 2. Open the DMG file
-3. Drag `QuickMac.app` to your Applications folder
+3. Drag `QuickBar.app` to your Applications folder
 4. Launch the app — it will appear in your menu bar
 
 ## Usage
 
-Click the ⚡ icon in your menu bar to open QuickMac. Click any tool card to run that utility. The popover automatically closes when you click outside it.
+Click the ⚡ icon in your menu bar to open QuickBar. Click any tool card to run that utility. The popover automatically closes when you click outside it.
 
 Drag and drop tool cards to rearrange them in your preferred order.
 

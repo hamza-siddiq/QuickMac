@@ -4,7 +4,7 @@ import Observation
 import SwiftUI
 
 @Observable
-class QuickMacState {
+class QuickBarState {
     var runningAppCount: Int = 0
     var isNoSleepEnabled: Bool = false
     var batteryHealth: String = "Unknown"
@@ -26,7 +26,7 @@ class QuickMacState {
     var scheduledShutdownTime: Date?
     var shutdownPID: Int?
     var frontmostAppBundleID: String?
-    var toolOrder: [QuickMacTool] = QuickMacTool.allCases
+    var toolOrder: [QuickBarTool] = QuickBarTool.allCases
     var isDialogOpen: Bool = false
 
     enum ActionStatus {

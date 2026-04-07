@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct ToolBlockView: View {
-    let tool: QuickMacTool
-    let state: QuickMacState
+    let tool: QuickBarTool
+    let state: QuickBarState
     let action: () -> Void
 
     var body: some View {

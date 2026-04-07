@@ -4,7 +4,7 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var popover: NSPopover!
-    var state: QuickMacState!
+    var state: QuickBarState!
     var passwordCompletion: ((String?) -> Void)?
     var isAnyDialogOpen = false
     var eventMonitor: Any?
@@ -12,7 +12,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        state = QuickMacState()
+        state = QuickBarState()
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
@@ -24,7 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: "QuickMac")
+            button.image = NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: "QuickBar")
             button.action = #selector(handleStatusItemClick)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
@@ -32,7 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.contentSize = NSSize(width: 320, height: 500)
         popover.behavior = .applicationDefined
-        popover.contentViewController = NSHostingController(rootView: QuickMacView(state: state, delegate: self))
+        popover.contentViewController = NSHostingController(rootView: QuickBarView(state: state, delegate: self))
 
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.popover.isShown, !self.isAnyDialogOpen else { return }
@@ -62,7 +62,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showContextMenu() {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Quit QuickMac", action: #selector(quitApp), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit QuickBar", action: #selector(quitApp), keyEquivalent: "q"))
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
@@ -115,7 +115,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showKillFrozenAppDialog() {
-        let apps = QuickMacServices.shared.getRunningApps()
+        let apps = QuickBarServices.shared.getRunningApps()
 
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 400),
                               styleMask: [.titled, .closable],
@@ -129,7 +129,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let hostingView = NSHostingView(rootView: KillAppPickerView(
             apps: apps,
             onQuit: { [weak self, weak window] app in
-                QuickMacServices.shared.forceQuitApp(app)
+                QuickBarServices.shared.forceQuitApp(app)
                 self?.isAnyDialogOpen = false
                 window?.close()
             },
@@ -180,7 +180,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let hostingView = NSHostingView(rootView: ForceEjectView(
             volumes: volumes,
             onEject: { [weak self, weak window] volume in
-                _ = QuickMacServices.shared.forceEjectVolume(volume)
+                _ = QuickBarServices.shared.forceEjectVolume(volume)
                 self?.isAnyDialogOpen = false
                 window?.close()
             },
@@ -207,7 +207,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let hostingView = NSHostingView(rootView: QuarantinePickerView(
             onPick: { [weak self, weak window] url in
-                _ = QuickMacServices.shared.removeQuarantine(from: url)
+                _ = QuickBarServices.shared.removeQuarantine(from: url)
                 self?.isAnyDialogOpen = false
                 window?.close()
             },
@@ -320,7 +320,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let result = QuickMacServices.shared.scheduledShutdown(date: date, adminPassword: password)
+            let result = QuickBarServices.shared.scheduledShutdown(date: date, adminPassword: password)
 
             DispatchQueue.main.async {
                 switch result {
@@ -369,7 +369,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let result = QuickMacServices.shared.cancelScheduledShutdown(pid: pid, adminPassword: password)
+            let result = QuickBarServices.shared.cancelScheduledShutdown(pid: pid, adminPassword: password)
 
             DispatchQueue.main.async {
                 switch result {

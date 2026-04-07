@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-enum QuickMacTool: String, CaseIterable, Identifiable {
+enum QuickBarTool: String, CaseIterable, Identifiable {
     case quitAllApps = "quit_all"
     case killFrozenApp = "kill_frozen"
     case purgeMemory = "purge_memory"

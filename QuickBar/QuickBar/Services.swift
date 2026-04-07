@@ -2,8 +2,8 @@ import Foundation
 import SwiftUI
 import AppKit
 
-class QuickMacServices {
-    static let shared = QuickMacServices()
+class QuickBarServices {
+    static let shared = QuickBarServices()
 
     func runCommand(_ command: String, arguments: [String], adminPassword: String? = nil) -> Result<String, Error> {
         let task = Process()
@@ -37,7 +37,7 @@ class QuickMacServices {
                 return .success(output)
             } else {
                 let error = String(data: errData, encoding: .utf8) ?? "Unknown error"
-                return .failure(NSError(domain: "QuickMac", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: error]))
+                return .failure(NSError(domain: "QuickBar", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: error]))
             }
         } catch {
             return .failure(error)
@@ -73,7 +73,7 @@ class QuickMacServices {
                 return .success(output)
             } else {
                 let error = String(data: errData, encoding: .utf8) ?? "Unknown error"
-                return .failure(NSError(domain: "QuickMac", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: error]))
+                return .failure(NSError(domain: "QuickBar", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: error]))
             }
         } catch {
             return .failure(error)
@@ -152,7 +152,7 @@ class QuickMacServices {
                 return .success("Quarantine removed")
             } else {
                 let err = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "Failed"
-                return .failure(NSError(domain: "QuickMac", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: err]))
+                return .failure(NSError(domain: "QuickBar", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: err]))
             }
         } catch {
             return .failure(error)
@@ -212,7 +212,7 @@ class QuickMacServices {
                 return .success(output)
             } else {
                 let error = String(data: errData, encoding: .utf8) ?? "Failed to eject"
-                return .failure(NSError(domain: "QuickMac", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: error]))
+                return .failure(NSError(domain: "QuickBar", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: error]))
             }
         } catch {
             return .failure(error)
@@ -232,7 +232,7 @@ class QuickMacServices {
     func scheduledShutdown(date: Date, adminPassword: String) -> Result<Int, Error> {
         let interval = Int(date.timeIntervalSinceNow)
         guard interval > 0 else {
-            return .failure(NSError(domain: "QuickMac", code: -1, userInfo: [NSLocalizedDescriptionKey: "Time must be in the future"]))
+            return .failure(NSError(domain: "QuickBar", code: -1, userInfo: [NSLocalizedDescriptionKey: "Time must be in the future"]))
         }
         let seconds = interval
         let scriptPath = "/tmp/quickmac_shutdown.sh"
@@ -249,7 +249,7 @@ class QuickMacServices {
                 if let pid = Int(pidStr) {
                     return .success(pid)
                 } else {
-                    return .failure(NSError(domain: "QuickMac", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to capture shutdown PID"]))
+                    return .failure(NSError(domain: "QuickBar", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to capture shutdown PID"]))
                 }
             case .failure(let error):
                 return .failure(error)
@@ -329,8 +329,8 @@ class QuickMacServices {
         // Skip kernel threads and very short commands
         if cmd.hasPrefix("[") || cmd.count < 3 { return nil }
 
-        // Skip ps itself and QuickMac
-        if cmd.contains("QuickMac") || lowerCmd.contains("/bin/ps") { return nil }
+        // Skip ps itself and QuickBar
+        if cmd.contains("QuickBar") || lowerCmd.contains("/bin/ps") { return nil }
 
         // Skip all macOS system processes
         let systemPaths = [
@@ -576,7 +576,7 @@ class QuickMacServices {
                 return .success("Process \(pid) killed")
             } else {
                 let err = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "Failed"
-                return .failure(NSError(domain: "QuickMac", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: err]))
+                return .failure(NSError(domain: "QuickBar", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: err]))
             }
         } catch {
             return .failure(error)
