@@ -2,7 +2,13 @@
 
 A lightweight macOS menu bar app that gives you quick access to essential system utilities with a single click.
 
-<img src="Screenshot.png" alt="QuickBar Screenshot" width="320">
+### Light Mode
+
+<img src="Screenshot-light.png" alt="QuickBar Light Mode" width="320">
+
+### Dark Mode
+
+<img src="Screenshot-dark.png" alt="QuickBar Dark Mode" width="320">
 
 ## Download
 
