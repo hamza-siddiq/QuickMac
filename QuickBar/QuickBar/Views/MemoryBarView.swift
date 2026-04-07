@@ -7,7 +7,7 @@ struct MemoryBarView: View {
     let percent: Double
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 5) {
             HStack {
                 Text("\(used, specifier: "%.1f") / \(total, specifier: "%.1f") GB")
                     .font(.system(size: 10))
@@ -24,17 +24,21 @@ struct MemoryBarView: View {
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color(nsColor: .separatorColor).opacity(0.3))
-                        .frame(height: 3)
+                    Capsule()
+                        .fill(.secondary.opacity(0.12))
 
-                    Rectangle()
-                        .fill(Color(nsColor: .secondaryLabelColor).opacity(0.5))
-                        .frame(width: geometry.size.width * CGFloat(min(percent, 100) / 100), height: 3)
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width * CGFloat(min(percent, 100) / 100))
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 1.5))
             }
-            .frame(height: 3)
+            .frame(height: 4)
         }
     }
 }

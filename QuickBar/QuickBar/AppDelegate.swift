@@ -32,7 +32,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.contentSize = NSSize(width: 320, height: 500)
         popover.behavior = .applicationDefined
+        popover.animates = true
         popover.contentViewController = NSHostingController(rootView: QuickBarView(state: state, delegate: self))
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(popoverDidShow(_:)),
+            name: NSPopover.didShowNotification,
+            object: popover
+        )
 
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.popover.isShown, !self.isAnyDialogOpen else { return }
@@ -40,6 +48,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                !popoverWindow.frame.contains(event.locationInWindow) {
                 self.popover.performClose(nil)
             }
+        }
+    }
+
+    @objc private func popoverDidShow(_ notification: Notification) {
+        if let window = popover.contentViewController?.view.window {
+            window.backgroundColor = .clear
+            window.isOpaque = false
+            window.hasShadow = true
         }
     }
 

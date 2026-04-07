@@ -9,40 +9,43 @@ struct QuickBarView: View {
         VStack(spacing: 0) {
             headerSection
             memoryBarSection
-            Divider()
+                .padding(.top, 4)
             toolsList
-            Divider()
             statusSection
         }
         .frame(width: 320)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(.regularMaterial)
         .onAppear {
             refreshData()
         }
     }
 
     private var headerSection: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text("QuickBar")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
 
             Spacer()
 
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Text("\(state.runningAppCount) apps")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
                     .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.secondary.opacity(0.12))
+                    .clipShape(Capsule())
 
                 Button(action: refreshData) {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(.secondary)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     private var memoryBarSection: some View {
@@ -52,12 +55,12 @@ struct QuickBarView: View {
             purgeable: state.memoryPurgeable,
             percent: state.memoryUsagePercent
         )
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 6)
     }
 
     private var toolsList: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
             ForEach(state.toolOrder) { tool in
                 ToolBlockView(tool: tool, state: state) {
                     handleToolAction(tool)
@@ -68,8 +71,8 @@ struct QuickBarView: View {
                 .onDrop(of: [.text], delegate: ToolDropDelegate(tool: tool, toolOrder: state.toolOrder, onReorder: { state.toolOrder = $0 }))
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 
     private var statusSection: some View {
@@ -78,36 +81,46 @@ struct QuickBarView: View {
             case .idle:
                 EmptyView()
             case .inProgress:
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     ProgressView()
-                        .scaleEffect(0.7)
+                        .scaleEffect(0.6)
                     Text(state.lastAction ?? "")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
-                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.secondary.opacity(0.1))
+                .clipShape(Capsule())
             case .success:
                 HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 11))
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
                     Text(state.lastAction ?? "Done")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                 }
-                .foregroundColor(.secondary)
-                .padding(.vertical, 8)
+                .foregroundColor(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.green.opacity(0.1))
+                .clipShape(Capsule())
             case .failure:
                 HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.circle")
-                        .font(.system(size: 11))
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 10))
                     Text(state.lastAction ?? "Failed")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                 }
                 .foregroundColor(.red)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.red.opacity(0.1))
+                .clipShape(Capsule())
             }
         }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private func refreshData() {

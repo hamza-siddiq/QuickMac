@@ -40,6 +40,8 @@ struct PasswordPromptView: View {
         }
         .padding()
         .frame(width: 280)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isPasswordFocused = true
@@ -100,6 +102,8 @@ struct KillAppPickerView: View {
             .frame(height: 300)
         }
         .frame(width: 300, height: 400)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -125,7 +129,7 @@ struct LargeFilesView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
+                    ForEach(Array(files.enumerated()), id: \.element.id) { _, file in
                         HStack(spacing: 10) {
                             Image(systemName: "doc")
                                 .foregroundColor(.secondary)
@@ -164,6 +168,8 @@ struct LargeFilesView: View {
             .frame(height: 350)
         }
         .frame(width: 480, height: 450)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -190,7 +196,7 @@ struct ForceEjectView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(Array(volumes.enumerated()), id: \.element) { index, volume in
+                    ForEach(Array(volumes.enumerated()), id: \.element) { _, volume in
                         HStack(spacing: 10) {
                             Image(systemName: "externaldrive")
                                 .foregroundColor(.secondary)
@@ -217,6 +223,8 @@ struct ForceEjectView: View {
             .frame(height: 200)
         }
         .frame(width: 320, height: 300)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -258,6 +266,8 @@ struct QuarantinePickerView: View {
         }
         .padding()
         .frame(width: 280)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -301,7 +311,11 @@ struct ScheduledShutdownView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
-                            .background(selectedMinutes == mins && !useCustom ? Color(nsColor: .secondaryLabelColor).opacity(0.2) : Color(nsColor: .controlBackgroundColor))
+                            .background(
+                                selectedMinutes == mins && !useCustom
+                                    ? Color.accentColor.opacity(0.15)
+                                    : Color(nsColor: .controlBackgroundColor)
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
@@ -337,6 +351,8 @@ struct ScheduledShutdownView: View {
         }
         .padding()
         .frame(width: 280)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
     private var formattedTime: String {
@@ -379,6 +395,8 @@ struct CancelShutdownView: View {
         }
         .padding()
         .frame(width: 280)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
     private var formattedTime: String {
@@ -436,7 +454,7 @@ struct ProcessMonitorView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
-                        ForEach(Array(filteredGroups.enumerated()), id: \.element.id) { index, group in
+                        ForEach(Array(filteredGroups.enumerated()), id: \.element.id) { _, group in
                             HStack(spacing: 10) {
                                 Image(systemName: group.category.icon)
                                     .foregroundColor(.secondary)
@@ -455,7 +473,7 @@ struct ProcessMonitorView: View {
                                                 .foregroundColor(.secondary)
                                                 .padding(.horizontal, 4)
                                                 .padding(.vertical, 1)
-                                                .background(Color(nsColor: .separatorColor).opacity(0.3))
+                                                .background(.secondary.opacity(0.1))
                                                 .clipShape(Capsule())
                                         }
                                     }
@@ -509,6 +527,8 @@ struct ProcessMonitorView: View {
             }
         }
         .frame(width: 520, height: 520)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .onAppear {
             loadProcesses()
         }
