@@ -2,11 +2,11 @@
 
 A lightweight macOS menu bar app that gives you quick access to essential system utilities with a single click.
 
-![QuickMac Screenshot](Screenshot.png)
+<img src="Screenshot.png" alt="QuickMac Screenshot" width="640">
 
 ## Download
 
-[⬇️ Download QuickMac.dmg](https://github.com/hamza-siddiq/QuickMac/raw/main/QuickMac.dmg)
+[⬇️ Download QuickMac.dmg](https://github.com/hamza-siddiq/QuickMac/releases)
 
 ## Features
 
