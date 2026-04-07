@@ -57,17 +57,19 @@ struct QuickMacView: View {
     }
 
     private var toolsList: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(QuickMacTool.allCases) { tool in
-                    ToolBlockView(tool: tool, state: state) {
-                        handleToolAction(tool)
-                    }
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            ForEach(state.toolOrder) { tool in
+                ToolBlockView(tool: tool, state: state) {
+                    handleToolAction(tool)
                 }
+                .onDrag {
+                    NSItemProvider(object: tool.rawValue as NSString)
+                }
+                .onDrop(of: [.text], delegate: ToolDropDelegate(tool: tool, toolOrder: state.toolOrder, onReorder: { state.toolOrder = $0 }))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private var statusSection: some View {
@@ -254,6 +256,41 @@ struct QuickMacView: View {
                 state.lastActionStatus = .inProgress
                 state.lastAction = message
                 action(password)
+            }
+        }
+    }
+}
+
+struct ToolDropDelegate: DropDelegate {
+    let tool: QuickMacTool
+    let toolOrder: [QuickMacTool]
+    let onReorder: ([QuickMacTool]) -> Void
+
+    func performDrop(info: DropInfo) -> Bool {
+        true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func dropEntered(info: DropInfo) {
+        if let item = info.itemProviders(for: ["public.plain-text"]).first {
+            _ = item.loadObject(ofClass: NSString.self) { (obj, error) in
+                if let raw = obj as? String,
+                   let source = QuickMacTool(rawValue: raw),
+                   let fromIndex = toolOrder.firstIndex(of: source),
+                   let toIndex = toolOrder.firstIndex(of: tool),
+                   fromIndex != toIndex {
+                    var newOrder = toolOrder
+                    DispatchQueue.main.async {
+                        withAnimation {
+                            let moved = newOrder.remove(at: fromIndex)
+                            newOrder.insert(moved, at: toIndex)
+                            self.onReorder(newOrder)
+                        }
+                    }
+                }
             }
         }
     }

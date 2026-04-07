@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Observation
+import SwiftUI
 
 @Observable
 class QuickMacState {
@@ -25,6 +26,8 @@ class QuickMacState {
     var scheduledShutdownTime: Date?
     var shutdownPID: Int?
     var frontmostAppBundleID: String?
+    var toolOrder: [QuickMacTool] = QuickMacTool.allCases
+    var isDialogOpen: Bool = false
 
     enum ActionStatus {
         case idle, success, failure, inProgress

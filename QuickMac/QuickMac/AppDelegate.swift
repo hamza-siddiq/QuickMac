@@ -6,6 +6,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover!
     var state: QuickMacState!
     var passwordCompletion: ((String?) -> Void)?
+    var isAnyDialogOpen = false
+    var eventMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -31,6 +33,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentSize = NSSize(width: 320, height: 500)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: QuickMacView(state: state, delegate: self))
+
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, self.popover.isShown, !self.isAnyDialogOpen else { return }
+            if let popoverWindow = self.popover.contentViewController?.view.window,
+               !popoverWindow.frame.contains(event.locationInWindow) {
+                self.popover.performClose(nil)
+            }
+        }
     }
 
     @objc private func appDidActivate(_ notification: Notification) {
@@ -88,16 +98,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onConfirm: { [weak self, weak window] password in
                 self?.passwordCompletion?(password)
                 self?.passwordCompletion = nil
+                self?.isAnyDialogOpen = false
                 window?.close()
             },
             onCancel: { [weak self, weak window] in
                 self?.passwordCompletion?(nil)
                 self?.passwordCompletion = nil
+                self?.isAnyDialogOpen = false
                 window?.close()
             }
         ))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -115,16 +128,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let hostingView = NSHostingView(rootView: KillAppPickerView(
             apps: apps,
-            onQuit: { [weak window] app in
+            onQuit: { [weak self, weak window] app in
                 QuickMacServices.shared.forceQuitApp(app)
+                self?.isAnyDialogOpen = false
                 window?.close()
             },
-            onCancel: { [weak window] in
+            onCancel: { [weak self, weak window] in
+                self?.isAnyDialogOpen = false
                 window?.close()
             }
         ))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -140,12 +156,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let hostingView = NSHostingView(rootView: LargeFilesView(
             files: files,
-            onDismiss: { [weak window] in
+            onDismiss: { [weak self, weak window] in
+                self?.isAnyDialogOpen = false
                 window?.close()
             }
         ))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -161,16 +179,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let hostingView = NSHostingView(rootView: ForceEjectView(
             volumes: volumes,
-            onEject: { [weak window] volume in
+            onEject: { [weak self, weak window] volume in
                 _ = QuickMacServices.shared.forceEjectVolume(volume)
+                self?.isAnyDialogOpen = false
                 window?.close()
             },
-            onDismiss: { [weak window] in
+            onDismiss: { [weak self, weak window] in
+                self?.isAnyDialogOpen = false
                 window?.close()
             }
         ))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -185,16 +206,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
 
         let hostingView = NSHostingView(rootView: QuarantinePickerView(
-            onPick: { [weak window] url in
+            onPick: { [weak self, weak window] url in
                 _ = QuickMacServices.shared.removeQuarantine(from: url)
+                self?.isAnyDialogOpen = false
                 window?.close()
             },
-            onDismiss: { [weak window] in
+            onDismiss: { [weak self, weak window] in
+                self?.isAnyDialogOpen = false
                 window?.close()
             }
         ))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -211,14 +235,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let hostingView = NSHostingView(rootView: ScheduledShutdownView(
             onSchedule: { [weak self, weak window] date in
                 self?.handleScheduledShutdown(date: date)
+                self?.isAnyDialogOpen = false
                 window?.close()
             },
-            onDismiss: { [weak window] in
+            onDismiss: { [weak self, weak window] in
+                self?.isAnyDialogOpen = false
                 window?.close()
             }
         ))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -238,14 +265,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             scheduledTime: scheduledTime,
             onCancel: { [weak self, weak window] in
                 self?.handleCancelShutdown()
+                self?.isAnyDialogOpen = false
                 window?.close()
             },
-            onDismiss: { [weak window] in
+            onDismiss: { [weak self, weak window] in
+                self?.isAnyDialogOpen = false
                 window?.close()
             }
         ))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -260,12 +290,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
 
         let hostingView = NSHostingView(rootView: ProcessMonitorView(
-            onDismiss: { [weak window] in
+            onDismiss: { [weak self, weak window] in
+                self?.isAnyDialogOpen = false
                 window?.close()
             }
         ))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
+        isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
     }
 
