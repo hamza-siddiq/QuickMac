@@ -1,7 +1,7 @@
 from ds_store import DSStore
 import os
 
-dmg_path = "/Volumes/QuickMac"
+dmg_path = "/Volumes/QuickBar"
 ds_store_path = os.path.join(dmg_path, ".DS_Store")
 
 with DSStore.open(ds_store_path, "w+") as ds:
@@ -39,8 +39,8 @@ with DSStore.open(ds_store_path, "w+") as ds:
             'size': {'width': 540, 'height': 360}
         }
     }
-    
-    ds["QuickMac.app"]["icgp"] = {'x': 140, 'y': 160}
+
+    ds["QuickBar.app"]["icgp"] = {'x': 140, 'y': 160}
     ds["Applications"]["icgp"] = {'x': 400, 'y': 160}
 
 print("DS_Store created successfully")

@@ -8,8 +8,7 @@ struct QuickBarView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerSection
-            memoryBarSection
-                .padding(.top, 4)
+            systemBarsSection
             toolsList
             statusSection
         }
@@ -20,44 +19,77 @@ struct QuickBarView: View {
         }
     }
 
+    // MARK: - Header
+
     private var headerSection: some View {
-        HStack(spacing: 8) {
-            Text("QuickBar")
-                .font(.system(size: 13, weight: .semibold))
-
-            Spacer()
-
+        VStack(spacing: 0) {
             HStack(spacing: 6) {
-                Text("\(state.runningAppCount) apps")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.secondary.opacity(0.12))
-                    .clipShape(Capsule())
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
 
-                Button(action: refreshData) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 10))
+                Text("QuickBar")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Text("\(state.runningAppCount) apps")
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background(.secondary.opacity(0.10))
+                        .clipShape(Capsule())
+
+                    Button(action: refreshData) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .rotationEffect(.degrees(state.isRefreshing ? 360 : 0))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            Divider().opacity(0.4)
+        }
+    }
+
+    // MARK: - System Bars
+
+    private var systemBarsSection: some View {
+        VStack(spacing: 6) {
+            SystemBarView(
+                label: "MEMORY",
+                used: state.memoryUsed,
+                total: state.memoryTotal,
+                percent: state.memoryUsagePercent,
+                extra: state.memoryPurgeable > 0.5
+                    ? "~\(String(format: "%.1f", state.memoryPurgeable)) GB freeable"
+                    : nil
+            )
+
+            SystemBarView(
+                label: "DISK",
+                used: state.diskUsed,
+                total: state.diskTotal,
+                percent: state.diskPercent
+            )
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
     }
 
-    private var memoryBarSection: some View {
-        MemoryBarView(
-            used: state.memoryUsed,
-            total: state.memoryTotal,
-            purgeable: state.memoryPurgeable,
-            percent: state.memoryUsagePercent
-        )
-        .padding(.horizontal, 14)
-        .padding(.bottom, 6)
-    }
+    // MARK: - Tools Grid
 
     private var toolsList: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
@@ -68,12 +100,21 @@ struct QuickBarView: View {
                 .onDrag {
                     NSItemProvider(object: tool.rawValue as NSString)
                 }
-                .onDrop(of: [.text], delegate: ToolDropDelegate(tool: tool, toolOrder: state.toolOrder, onReorder: { state.toolOrder = $0 }))
+                .onDrop(of: [.text], delegate: ToolDropDelegate(
+                    tool: tool,
+                    currentOrder: { state.toolOrder },
+                    onReorder: {
+                        state.toolOrder = $0
+                        state.saveToolOrder()
+                    }
+                ))
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
     }
+
+    // MARK: - Status
 
     private var statusSection: some View {
         Group {
@@ -90,8 +131,9 @@ struct QuickBarView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(.secondary.opacity(0.1))
+                .background(.secondary.opacity(0.08))
                 .clipShape(Capsule())
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             case .success:
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.circle.fill")
@@ -102,8 +144,9 @@ struct QuickBarView: View {
                 .foregroundColor(.green)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(.green.opacity(0.1))
+                .background(.green.opacity(0.08))
                 .clipShape(Capsule())
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             case .failure:
                 HStack(spacing: 4) {
                     Image(systemName: "exclamationmark.circle.fill")
@@ -114,32 +157,37 @@ struct QuickBarView: View {
                 .foregroundColor(.red)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(.red.opacity(0.1))
+                .background(.red.opacity(0.08))
                 .clipShape(Capsule())
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: state.lastActionStatus)
         .padding(.horizontal, 14)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
+    // MARK: - Data
+
     private func refreshData() {
         state.refreshAppCount()
         state.refreshBatteryInfo()
-        state.refreshEjectableVolumes()
         state.refreshMemoryInfo()
+        state.refreshDiskInfo()
+        state.refreshDarkMode()
     }
+
+    // MARK: - Tool Actions
 
     private func handleToolAction(_ tool: QuickBarTool) {
         switch tool {
         case .quitAllApps:
-            state.lastActionStatus = .inProgress
-            state.lastAction = "Quitting all other apps..."
+            state.setStatus(.inProgress, message: "Quitting all other apps...")
             services.quitAllOtherApps(excludeBundleID: state.frontmostAppBundleID)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 state.refreshAppCount()
-                state.lastActionStatus = .success
-                state.lastAction = "All other apps quit"
+                state.setStatus(.success, message: "All other apps quit")
             }
 
         case .killFrozenApp:
@@ -152,53 +200,31 @@ struct QuickBarView: View {
                 switch result {
                 case .success:
                     state.refreshMemoryInfo()
-                    state.lastActionStatus = .success
-                    state.lastAction = String(format: "Memory purged (%.1f GB freed)", freed)
+                    state.setStatus(.success, message: String(format: "Memory purged (%.1f GB freed)", freed))
                 case .failure(let error):
                     state.adminPassword = nil
-                    state.lastActionStatus = .failure
-                    state.lastAction = error.localizedDescription
+                    state.setStatus(.failure, message: error.localizedDescription)
                 }
             }
 
         case .noSleep:
             let newState = !state.isNoSleepEnabled
-            handleAdminAction(newState ? "Enabling no sleep..." : "Disabling no sleep...") { password in
+            handleAdminAction(newState ? "Enabling keep awake..." : "Disabling keep awake...") { password in
                 let result = services.toggleNoSleep(enabled: newState, adminPassword: password)
                 switch result {
                 case .success:
                     state.isNoSleepEnabled = newState
-                    state.lastActionStatus = .success
-                    state.lastAction = newState ? "No sleep enabled" : "No sleep disabled"
+                    state.setStatus(.success, message: newState ? "Keep awake enabled" : "Keep awake disabled")
                 case .failure(let error):
                     state.adminPassword = nil
-                    state.lastActionStatus = .failure
-                    state.lastAction = error.localizedDescription
-                }
-            }
-
-        case .removeQuarantine:
-            delegate.showQuarantineDialog()
-
-        case .resetBluetooth:
-            handleAdminAction("Resetting Bluetooth...") { password in
-                let result = services.resetBluetooth(adminPassword: password)
-                switch result {
-                case .success:
-                    state.lastActionStatus = .success
-                    state.lastAction = "Bluetooth reset"
-                case .failure(let error):
-                    state.adminPassword = nil
-                    state.lastActionStatus = .failure
-                    state.lastAction = error.localizedDescription
+                    state.setStatus(.failure, message: error.localizedDescription)
                 }
             }
 
         case .findLargeFiles:
             Task {
                 state.isScanningFiles = true
-                state.lastActionStatus = .inProgress
-                state.lastAction = "Scanning for large files..."
+                state.setStatus(.inProgress, message: "Scanning for large files...")
 
                 let dirs = [
                     FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads"),
@@ -209,41 +235,21 @@ struct QuickBarView: View {
                 let files = await services.findLargeFiles(in: dirs)
                 state.largeFiles = files
                 state.isScanningFiles = false
-                state.lastActionStatus = .success
-                state.lastAction = "Found \(files.count) large files"
 
-                if !files.isEmpty {
+                if files.isEmpty {
+                    state.setStatus(.success, message: "No large files found")
+                } else {
+                    state.setStatus(.success, message: "Found \(files.count) large files")
                     delegate.showLargeFilesDialog(files: files)
                 }
             }
 
         case .batteryHealth:
             state.refreshBatteryInfo()
-            state.lastActionStatus = .success
-            state.lastAction = "Battery: \(state.batteryHealth) (\(state.batteryCycleCount) cycles)"
+            state.setStatus(.success, message: "Battery: \(state.batteryHealth) (\(state.batteryCycleCount) cycles)")
 
-        case .forceEject:
-            state.refreshEjectableVolumes()
-            if state.forceEjectVolumes.isEmpty {
-                state.lastActionStatus = .success
-                state.lastAction = "No external drives found"
-            } else {
-                delegate.showForceEjectDialog(volumes: state.forceEjectVolumes)
-            }
-
-        case .networkReset:
-            handleAdminAction("Resetting network...") { password in
-                let result = services.resetNetwork(adminPassword: password)
-                switch result {
-                case .success:
-                    state.lastActionStatus = .success
-                    state.lastAction = "Network reset"
-                case .failure(let error):
-                    state.adminPassword = nil
-                    state.lastActionStatus = .failure
-                    state.lastAction = error.localizedDescription
-                }
-            }
+        case .processMonitor:
+            delegate.showProcessMonitorDialog()
 
         case .scheduledShutdown:
             if state.isShutdownScheduled {
@@ -252,22 +258,69 @@ struct QuickBarView: View {
                 delegate.showScheduledShutdownDialog()
             }
 
-        case .processMonitor:
-            delegate.showProcessMonitorDialog()
+        case .toggleDarkMode:
+            state.setStatus(.inProgress, message: "Toggling dark mode...")
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = services.toggleDarkMode()
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        state.refreshDarkMode()
+                        state.setStatus(.success, message: state.isDarkMode ? "Dark mode enabled" : "Light mode enabled")
+                    case .failure(let error):
+                        state.setStatus(.failure, message: error.localizedDescription)
+                    }
+                }
+            }
+
+        case .restartFinder:
+            state.setStatus(.inProgress, message: "Restarting Finder...")
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = services.restartFinder()
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        state.setStatus(.success, message: "Finder restarted")
+                    case .failure(let error):
+                        state.setStatus(.failure, message: error.localizedDescription)
+                    }
+                }
+            }
+
+        case .hideAllWindows:
+            state.setStatus(.inProgress, message: "Hiding all windows...")
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = services.hideAllWindows()
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        state.setStatus(.success, message: "All windows hidden")
+                    case .failure(let error):
+                        state.setStatus(.failure, message: error.localizedDescription)
+                    }
+                }
+            }
+
+        case .clearClipboard:
+            let result = services.clearClipboard()
+            switch result {
+            case .success:
+                state.setStatus(.success, message: "Clipboard cleared")
+            case .failure(let error):
+                state.setStatus(.failure, message: error.localizedDescription)
+            }
         }
     }
 
     private func handleAdminAction(_ message: String, action: @escaping (String) -> Void) {
         if let cached = state.adminPassword {
-            state.lastActionStatus = .inProgress
-            state.lastAction = message
+            state.setStatus(.inProgress, message: message)
             action(cached)
         } else {
             delegate.showPasswordPrompt { password in
                 guard let password else { return }
                 state.adminPassword = password
-                state.lastActionStatus = .inProgress
-                state.lastAction = message
+                state.setStatus(.inProgress, message: message)
                 action(password)
             }
         }
@@ -276,7 +329,7 @@ struct QuickBarView: View {
 
 struct ToolDropDelegate: DropDelegate {
     let tool: QuickBarTool
-    let toolOrder: [QuickBarTool]
+    let currentOrder: () -> [QuickBarTool]
     let onReorder: ([QuickBarTool]) -> Void
 
     func performDrop(info: DropInfo) -> Bool {
@@ -290,18 +343,18 @@ struct ToolDropDelegate: DropDelegate {
     func dropEntered(info: DropInfo) {
         if let item = info.itemProviders(for: ["public.plain-text"]).first {
             _ = item.loadObject(ofClass: NSString.self) { (obj, error) in
-                if let raw = obj as? String,
-                   let source = QuickBarTool(rawValue: raw),
-                   let fromIndex = toolOrder.firstIndex(of: source),
-                   let toIndex = toolOrder.firstIndex(of: tool),
-                   fromIndex != toIndex {
-                    var newOrder = toolOrder
-                    DispatchQueue.main.async {
-                        withAnimation {
-                            let moved = newOrder.remove(at: fromIndex)
-                            newOrder.insert(moved, at: toIndex)
-                            self.onReorder(newOrder)
-                        }
+                DispatchQueue.main.async {
+                    guard let raw = obj as? String,
+                          let source = QuickBarTool(rawValue: raw) else { return }
+                    let order = currentOrder()
+                    guard let fromIndex = order.firstIndex(of: source),
+                          let toIndex = order.firstIndex(of: tool),
+                          fromIndex != toIndex else { return }
+                    withAnimation {
+                        var newOrder = order
+                        let moved = newOrder.remove(at: fromIndex)
+                        newOrder.insert(moved, at: toIndex)
+                        self.onReorder(newOrder)
                     }
                 }
             }
