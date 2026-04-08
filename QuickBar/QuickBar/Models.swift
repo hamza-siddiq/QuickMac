@@ -7,47 +7,47 @@ enum QuickBarTool: String, CaseIterable, Identifiable {
     case purgeMemory = "purge_memory"
     case processMonitor = "process_monitor"
     case noSleep = "no_sleep"
-    case resetBluetooth = "reset_bluetooth"
-    case removeQuarantine = "remove_quarantine"
-    case networkReset = "network_reset"
-    case scheduledShutdown = "scheduled_shutdown"
-    case forceEject = "force_eject"
     case findLargeFiles = "find_large_files"
     case batteryHealth = "battery_health"
+    case scheduledShutdown = "scheduled_shutdown"
+    case toggleDarkMode = "toggle_dark_mode"
+    case restartFinder = "restart_finder"
+    case hideAllWindows = "hide_all_windows"
+    case clearClipboard = "clear_clipboard"
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .quitAllApps: "Quit All Other Apps"
-        case .killFrozenApp: "Kill Frozen App"
-        case .purgeMemory: "Purge Memory"
-        case .noSleep: "No Sleep"
-        case .removeQuarantine: "Remove Quarantine"
-        case .resetBluetooth: "Reset Bluetooth"
-        case .findLargeFiles: "Find Large Files"
-        case .batteryHealth: "Battery Health"
-        case .forceEject: "Force Eject"
-        case .networkReset: "Network Reset"
-        case .scheduledShutdown: "Scheduled Shutdown"
-        case .processMonitor: "Process Monitor"
+        case .quitAllApps: "Quit All Apps"
+        case .killFrozenApp: "Force Quit"
+        case .purgeMemory: "Free Memory"
+        case .noSleep: "Keep Awake"
+        case .findLargeFiles: "Large Files"
+        case .batteryHealth: "Battery"
+        case .processMonitor: "Processes"
+        case .scheduledShutdown: "Shutdown Timer"
+        case .toggleDarkMode: "Dark Mode"
+        case .restartFinder: "Restart Finder"
+        case .hideAllWindows: "Hide All"
+        case .clearClipboard: "Clear Clipboard"
         }
     }
 
     var description: String {
         switch self {
-        case .quitAllApps: "Quit all apps except the frontmost one"
-        case .killFrozenApp: "Force quit a hung application"
-        case .purgeMemory: "Clear inactive RAM to free memory"
-        case .noSleep: "Prevent Mac from sleeping"
-        case .removeQuarantine: "Fix 'unidentified developer' blocks"
-        case .resetBluetooth: "Restart Bluetooth when devices disconnect"
-        case .findLargeFiles: "Find files taking up disk space"
-        case .batteryHealth: "Check battery cycle count and condition"
-        case .forceEject: "Eject stuck external drives"
-        case .networkReset: "Flush DNS and renew network connection"
-        case .scheduledShutdown: "Shut down after set minutes"
-        case .processMonitor: "View and kill background processes"
+        case .quitAllApps: "Close all open apps"
+        case .killFrozenApp: "Force quit a stuck app"
+        case .purgeMemory: "Clear inactive RAM"
+        case .noSleep: "Prevent sleep mode"
+        case .findLargeFiles: "Find space hogs"
+        case .batteryHealth: "Cycles & condition"
+        case .processMonitor: "View running processes"
+        case .scheduledShutdown: "Auto shutdown later"
+        case .toggleDarkMode: "Toggle appearance"
+        case .restartFinder: "Fix Finder issues"
+        case .hideAllWindows: "Show the desktop"
+        case .clearClipboard: "Erase copied data"
         }
     }
 
@@ -56,25 +56,38 @@ enum QuickBarTool: String, CaseIterable, Identifiable {
         case .quitAllApps: "xmark.app"
         case .killFrozenApp: "exclamationmark.triangle"
         case .purgeMemory: "memorychip"
-        case .noSleep: "moon.circle"
-        case .removeQuarantine: "shield.slash"
-        case .resetBluetooth: "antenna.radiowaves.left.and.right"
-        case .findLargeFiles: "magnifyingglass"
+        case .noSleep: "moon.zzz"
+        case .findLargeFiles: "externaldrive.badge.magnifyingglass"
         case .batteryHealth: "battery.100.bolt"
-        case .forceEject: "eject.circle"
-        case .networkReset: "network"
-        case .scheduledShutdown: "power.circle"
         case .processMonitor: "list.bullet.rectangle"
+        case .scheduledShutdown: "power.circle"
+        case .toggleDarkMode: "moon.fill"
+        case .restartFinder: "arrow.triangle.2.circlepath"
+        case .hideAllWindows: "macwindow.on.rectangle"
+        case .clearClipboard: "doc.on.clipboard"
         }
     }
 
     var accentColor: Color {
-        .primary
+        switch self {
+        case .quitAllApps: .red
+        case .killFrozenApp: .orange
+        case .purgeMemory: .purple
+        case .noSleep: .yellow
+        case .findLargeFiles: .green
+        case .batteryHealth: .mint
+        case .processMonitor: .blue
+        case .scheduledShutdown: .red
+        case .toggleDarkMode: .indigo
+        case .restartFinder: .cyan
+        case .hideAllWindows: .teal
+        case .clearClipboard: .pink
+        }
     }
 
     var requiresAdmin: Bool {
         switch self {
-        case .purgeMemory, .noSleep, .resetBluetooth, .networkReset, .scheduledShutdown: true
+        case .purgeMemory, .noSleep, .scheduledShutdown: true
         default: false
         }
     }

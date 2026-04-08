@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ServiceManagement
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
@@ -8,11 +9,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var passwordCompletion: ((String?) -> Void)?
     var isAnyDialogOpen = false
     var eventMonitor: Any?
+    var launchAtLogin: Bool {
+        get { UserDefaults.standard.bool(forKey: "launchAtLogin") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "launchAtLogin")
+            if #available(macOS 13.0, *) {
+                do {
+                    if newValue {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
+                    }
+                } catch {
+                    print("Failed to update login item: \(error)")
+                }
+            }
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         state = QuickBarState()
+
+        if UserDefaults.standard.object(forKey: "launchAtLogin") == nil {
+            launchAtLogin = true
+        }
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
@@ -24,13 +46,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: "QuickBar")
+            button.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "QuickBar")
             button.action = #selector(handleStatusItemClick)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 320, height: 500)
+        popover.contentSize = NSSize(width: 320, height: 540)
         popover.behavior = .applicationDefined
         popover.animates = true
         popover.contentViewController = NSHostingController(rootView: QuickBarView(state: state, delegate: self))
@@ -64,24 +86,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
            app.bundleIdentifier != Bundle.main.bundleIdentifier,
            app.activationPolicy == .regular {
             state.frontmostAppBundleID = app.bundleIdentifier
+            if popover.isShown && !isAnyDialogOpen {
+                popover.performClose(nil)
+            }
         }
+    }
+
+    private var contextMenu: NSMenu {
+        let menu = NSMenu()
+        let launchItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        launchItem.state = launchAtLogin ? .on : .off
+        menu.addItem(launchItem)
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Quit QuickBar", action: #selector(quitApp), keyEquivalent: "q"))
+        return menu
     }
 
     @objc func handleStatusItemClick(_ sender: AnyObject?) {
         let event = NSApp.currentEvent!
         if event.type == .rightMouseUp {
-            showContextMenu()
+            statusItem.menu = contextMenu
+            statusItem.button?.performClick(nil)
+            statusItem.menu = nil
         } else {
             togglePopover()
         }
     }
 
-    private func showContextMenu() {
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Quit QuickBar", action: #selector(quitApp), keyEquivalent: "q"))
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
+    @objc private func toggleLaunchAtLogin() {
+        launchAtLogin.toggle()
     }
 
     @objc func togglePopover() {
@@ -98,11 +131,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
-    func showPasswordPrompt(completion: @escaping (String?) -> Void) {
-        passwordCompletion = completion
+    // MARK: - Dialogs
 
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 280, height: 220),
-                              styleMask: [.titled, .closable],
+    private func showDialog(width: CGFloat, height: CGFloat, resizable: Bool = false, content: @escaping (@escaping () -> Void) -> AnyView) {
+        var styleMask: NSWindow.StyleMask = [.titled, .closable]
+        if resizable { styleMask.insert(.resizable) }
+
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+                              styleMask: styleMask,
                               backing: .buffered,
                               defer: false)
         window.title = ""
@@ -110,211 +146,94 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.isReleasedWhenClosed = false
 
-        let hostingView = NSHostingView(rootView: PasswordPromptView(
-            onConfirm: { [weak self, weak window] password in
-                self?.passwordCompletion?(password)
-                self?.passwordCompletion = nil
-                self?.isAnyDialogOpen = false
-                window?.close()
-            },
-            onCancel: { [weak self, weak window] in
-                self?.passwordCompletion?(nil)
-                self?.passwordCompletion = nil
-                self?.isAnyDialogOpen = false
-                window?.close()
-            }
-        ))
+        let dismiss: () -> Void = { [weak self, weak window] in
+            self?.isAnyDialogOpen = false
+            window?.close()
+        }
+
+        let hostingView = NSHostingView(rootView: content(dismiss))
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
         isAnyDialogOpen = true
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func showPasswordPrompt(completion: @escaping (String?) -> Void) {
+        passwordCompletion = completion
+
+        showDialog(width: 280, height: 220) { [weak self] dismiss in
+            AnyView(PasswordPromptView(
+                onConfirm: { password in
+                    self?.passwordCompletion?(password)
+                    self?.passwordCompletion = nil
+                    dismiss()
+                },
+                onCancel: {
+                    self?.passwordCompletion?(nil)
+                    self?.passwordCompletion = nil
+                    dismiss()
+                }
+            ))
+        }
     }
 
     func showKillFrozenAppDialog() {
         let apps = QuickBarServices.shared.getRunningApps()
 
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 400),
-                              styleMask: [.titled, .closable],
-                              backing: .buffered,
-                              defer: false)
-        window.title = ""
-        window.level = .floating
-        window.center()
-        window.isReleasedWhenClosed = false
-
-        let hostingView = NSHostingView(rootView: KillAppPickerView(
-            apps: apps,
-            onQuit: { [weak self, weak window] app in
-                QuickBarServices.shared.forceQuitApp(app)
-                self?.isAnyDialogOpen = false
-                window?.close()
-            },
-            onCancel: { [weak self, weak window] in
-                self?.isAnyDialogOpen = false
-                window?.close()
-            }
-        ))
-        window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
-        isAnyDialogOpen = true
-        NSApp.activate(ignoringOtherApps: true)
+        showDialog(width: 300, height: 400) { dismiss in
+            AnyView(KillAppPickerView(
+                apps: apps,
+                onQuit: { app in
+                    QuickBarServices.shared.forceQuitApp(app)
+                    dismiss()
+                },
+                onCancel: { dismiss() }
+            ))
+        }
     }
 
     func showLargeFilesDialog(files: [LargeFile]) {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 450),
-                              styleMask: [.titled, .closable, .resizable],
-                              backing: .buffered,
-                              defer: false)
-        window.title = ""
-        window.level = .floating
-        window.center()
-        window.isReleasedWhenClosed = false
-
-        let hostingView = NSHostingView(rootView: LargeFilesView(
-            files: files,
-            onDismiss: { [weak self, weak window] in
-                self?.isAnyDialogOpen = false
-                window?.close()
-            }
-        ))
-        window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
-        isAnyDialogOpen = true
-        NSApp.activate(ignoringOtherApps: true)
+        showDialog(width: 480, height: 450, resizable: true) { dismiss in
+            AnyView(LargeFilesView(
+                files: files,
+                onDismiss: { dismiss() }
+            ))
+        }
     }
 
-    func showForceEjectDialog(volumes: [String]) {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 300),
-                              styleMask: [.titled, .closable],
-                              backing: .buffered,
-                              defer: false)
-        window.title = ""
-        window.level = .floating
-        window.center()
-        window.isReleasedWhenClosed = false
-
-        let hostingView = NSHostingView(rootView: ForceEjectView(
-            volumes: volumes,
-            onEject: { [weak self, weak window] volume in
-                _ = QuickBarServices.shared.forceEjectVolume(volume)
-                self?.isAnyDialogOpen = false
-                window?.close()
-            },
-            onDismiss: { [weak self, weak window] in
-                self?.isAnyDialogOpen = false
-                window?.close()
-            }
-        ))
-        window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
-        isAnyDialogOpen = true
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    func showQuarantineDialog() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 280, height: 260),
-                              styleMask: [.titled, .closable],
-                              backing: .buffered,
-                              defer: false)
-        window.title = ""
-        window.level = .floating
-        window.center()
-        window.isReleasedWhenClosed = false
-
-        let hostingView = NSHostingView(rootView: QuarantinePickerView(
-            onPick: { [weak self, weak window] url in
-                _ = QuickBarServices.shared.removeQuarantine(from: url)
-                self?.isAnyDialogOpen = false
-                window?.close()
-            },
-            onDismiss: { [weak self, weak window] in
-                self?.isAnyDialogOpen = false
-                window?.close()
-            }
-        ))
-        window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
-        isAnyDialogOpen = true
-        NSApp.activate(ignoringOtherApps: true)
+    func showProcessMonitorDialog() {
+        showDialog(width: 520, height: 520, resizable: true) { dismiss in
+            AnyView(ProcessMonitorView(
+                onDismiss: { dismiss() }
+            ))
+        }
     }
 
     func showScheduledShutdownDialog() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 280, height: 380),
-                              styleMask: [.titled, .closable],
-                              backing: .buffered,
-                              defer: false)
-        window.title = ""
-        window.level = .floating
-        window.center()
-        window.isReleasedWhenClosed = false
-
-        let hostingView = NSHostingView(rootView: ScheduledShutdownView(
-            onSchedule: { [weak self, weak window] date in
-                self?.handleScheduledShutdown(date: date)
-                self?.isAnyDialogOpen = false
-                window?.close()
-            },
-            onDismiss: { [weak self, weak window] in
-                self?.isAnyDialogOpen = false
-                window?.close()
-            }
-        ))
-        window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
-        isAnyDialogOpen = true
-        NSApp.activate(ignoringOtherApps: true)
+        showDialog(width: 280, height: 380) { [weak self] dismiss in
+            AnyView(ScheduledShutdownView(
+                onSchedule: { date in
+                    dismiss()
+                    self?.handleScheduledShutdown(date: date)
+                },
+                onDismiss: { dismiss() }
+            ))
+        }
     }
 
     func showCancelShutdownDialog() {
         guard let scheduledTime = state.scheduledShutdownTime else { return }
 
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 280, height: 260),
-                              styleMask: [.titled, .closable],
-                              backing: .buffered,
-                              defer: false)
-        window.title = ""
-        window.level = .floating
-        window.center()
-        window.isReleasedWhenClosed = false
-
-        let hostingView = NSHostingView(rootView: CancelShutdownView(
-            scheduledTime: scheduledTime,
-            onCancel: { [weak self, weak window] in
-                self?.handleCancelShutdown()
-                self?.isAnyDialogOpen = false
-                window?.close()
-            },
-            onDismiss: { [weak self, weak window] in
-                self?.isAnyDialogOpen = false
-                window?.close()
-            }
-        ))
-        window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
-        isAnyDialogOpen = true
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    func showProcessMonitorDialog() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 520),
-                              styleMask: [.titled, .closable, .resizable],
-                              backing: .buffered,
-                              defer: false)
-        window.title = ""
-        window.level = .floating
-        window.center()
-        window.isReleasedWhenClosed = false
-
-        let hostingView = NSHostingView(rootView: ProcessMonitorView(
-            onDismiss: { [weak self, weak window] in
-                self?.isAnyDialogOpen = false
-                window?.close()
-            }
-        ))
-        window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
-        isAnyDialogOpen = true
-        NSApp.activate(ignoringOtherApps: true)
+        showDialog(width: 280, height: 260) { [weak self] dismiss in
+            AnyView(CancelShutdownView(
+                scheduledTime: scheduledTime,
+                onCancel: {
+                    dismiss()
+                    self?.handleCancelShutdown()
+                },
+                onDismiss: { dismiss() }
+            ))
+        }
     }
 
     private func handleScheduledShutdown(date: Date) {
@@ -331,8 +250,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func executeScheduledShutdown(date: Date, password: String) {
         DispatchQueue.main.async {
-            self.state.lastActionStatus = .inProgress
-            self.state.lastAction = "Scheduling shutdown..."
+            self.state.setStatus(.inProgress, message: "Scheduling shutdown...")
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
@@ -346,12 +264,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self.state.isShutdownScheduled = true
                     self.state.scheduledShutdownTime = date
                     self.state.shutdownPID = pid
-                    self.state.lastActionStatus = .success
-                    self.state.lastAction = "Shutdown scheduled for \(formatter.string(from: date))"
+                    self.state.setStatus(.success, message: "Shutdown scheduled for \(formatter.string(from: date))")
                 case .failure(let error):
                     self.state.adminPassword = nil
-                    self.state.lastActionStatus = .failure
-                    self.state.lastAction = error.localizedDescription
+                    self.state.setStatus(.failure, message: error.localizedDescription)
                 }
             }
         }
@@ -374,14 +290,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             state.isShutdownScheduled = false
             state.scheduledShutdownTime = nil
             state.shutdownPID = nil
-            state.lastActionStatus = .success
-            state.lastAction = "Scheduled shutdown canceled"
+            state.setStatus(.success, message: "Scheduled shutdown canceled")
             return
         }
 
         DispatchQueue.main.async {
-            self.state.lastActionStatus = .inProgress
-            self.state.lastAction = "Canceling shutdown..."
+            self.state.setStatus(.inProgress, message: "Canceling shutdown...")
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
@@ -393,12 +307,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self.state.isShutdownScheduled = false
                     self.state.scheduledShutdownTime = nil
                     self.state.shutdownPID = nil
-                    self.state.lastActionStatus = .success
-                    self.state.lastAction = "Scheduled shutdown canceled"
+                    self.state.setStatus(.success, message: "Scheduled shutdown canceled")
                 case .failure(let error):
                     self.state.adminPassword = nil
-                    self.state.lastActionStatus = .failure
-                    self.state.lastAction = error.localizedDescription
+                    self.state.setStatus(.failure, message: error.localizedDescription)
                 }
             }
         }

@@ -18,7 +18,7 @@ class QuickBarServices {
         if let password = adminPassword {
             task.arguments = ["-S"] + (task.arguments ?? [])
             task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            
+
             let script = """
             do shell script "\(command) \(arguments.joined(separator: " "))" with administrator privileges password "\(password.replacingOccurrences(of: "\"", with: "\\\""))"
             """
@@ -80,24 +80,11 @@ class QuickBarServices {
         }
     }
 
-    func quitAllApps() {
-        let apps = NSWorkspace.shared.runningApplications.filter { app in
-            guard let bundleID = app.bundleIdentifier else { return false }
-            guard app.activationPolicy == .regular else { return false }
-            let excluded = ["com.apple.finder", "com.apple.dock", Bundle.main.bundleIdentifier]
-            return !excluded.contains(bundleID)
-        }
-
-        for app in apps {
-            if !app.terminate() {
-                app.forceTerminate()
-            }
-        }
-    }
+    // MARK: - App Management
 
     func quitAllOtherApps(excludeBundleID: String? = nil) {
         var excludedIDs = ["com.apple.finder", "com.apple.dock", Bundle.main.bundleIdentifier]
-        
+
         if let excludeID = excludeBundleID {
             excludedIDs.append(excludeID)
         }
@@ -127,6 +114,8 @@ class QuickBarServices {
         }
     }
 
+    // MARK: - System Tools
+
     func purgeMemory(adminPassword: String) -> Result<String, Error> {
         runSudoCommand("/usr/sbin/purge", adminPassword: adminPassword)
     }
@@ -134,33 +123,6 @@ class QuickBarServices {
     func toggleNoSleep(enabled: Bool, adminPassword: String) -> Result<String, Error> {
         let value = enabled ? "1" : "0"
         return runSudoCommand("/usr/bin/pmset disablesleep \(value)", adminPassword: adminPassword)
-    }
-
-    func removeQuarantine(from url: URL) -> Result<String, Error> {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
-        task.arguments = ["-d", "com.apple.quarantine", url.path]
-
-        let errPipe = Pipe()
-        task.standardError = errPipe
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-
-            if task.terminationStatus == 0 {
-                return .success("Quarantine removed")
-            } else {
-                let err = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "Failed"
-                return .failure(NSError(domain: "QuickBar", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: err]))
-            }
-        } catch {
-            return .failure(error)
-        }
-    }
-
-    func resetBluetooth(adminPassword: String) -> Result<String, Error> {
-        runSudoCommand("/usr/bin/pkill -9 bluetoothd; /bin/sleep 2; /usr/sbin/systemsetup -setremotelogin on 2>/dev/null; echo 'Bluetooth reset'", adminPassword: adminPassword)
     }
 
     func findLargeFiles(in directories: [URL]) async -> [LargeFile] {
@@ -190,59 +152,21 @@ class QuickBarServices {
         return files.sorted { $0.size > $1.size }.prefix(50).map { $0 }
     }
 
-    func forceEjectVolume(_ deviceNode: String) -> Result<String, Error> {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
-        task.arguments = ["unmountDisk", "force", "/dev/" + deviceNode]
-
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        task.standardOutput = outPipe
-        task.standardError = errPipe
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-
-            let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-
-            if task.terminationStatus == 0 {
-                let output = String(data: outData, encoding: .utf8) ?? ""
-                return .success(output)
-            } else {
-                let error = String(data: errData, encoding: .utf8) ?? "Failed to eject"
-                return .failure(NSError(domain: "QuickBar", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: error]))
-            }
-        } catch {
-            return .failure(error)
-        }
-    }
-
-    func resetNetwork(adminPassword: String) -> Result<String, Error> {
-        let commands = [
-            "/usr/bin/dscacheutil -flushcache",
-            "/usr/bin/killall -HUP mDNSResponder",
-            "/usr/sbin/networksetup -setproxyautodiscovery Wi-Fi off"
-        ].joined(separator: "; ")
-
-        return runSudoCommand(commands, adminPassword: adminPassword)
-    }
+    // MARK: - New Tools
 
     func scheduledShutdown(date: Date, adminPassword: String) -> Result<Int, Error> {
         let interval = Int(date.timeIntervalSinceNow)
         guard interval > 0 else {
             return .failure(NSError(domain: "QuickBar", code: -1, userInfo: [NSLocalizedDescriptionKey: "Time must be in the future"]))
         }
-        let seconds = interval
-        let scriptPath = "/tmp/quickmac_shutdown.sh"
-        let script = "#!/bin/bash\nsleep \(seconds)\n/sbin/shutdown -h now\n"
-        
+        let scriptPath = "/tmp/quickbar_shutdown.sh"
+        let script = "#!/bin/bash\nsleep \(interval)\n/sbin/shutdown -h now\n"
+
         do {
             try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
             let command = "chmod +x \(scriptPath) && nohup \(scriptPath) > /dev/null 2>&1 & echo $!"
             let result = runSudoCommand(command, adminPassword: adminPassword)
-            
+
             switch result {
             case .success(let output):
                 let pidStr = output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -260,8 +184,40 @@ class QuickBarServices {
     }
 
     func cancelScheduledShutdown(pid: Int, adminPassword: String) -> Result<String, Error> {
-        runSudoCommand("kill -9 \(pid) 2>/dev/null; rm -f /tmp/quickmac_shutdown.sh /tmp/quickmac_shutdown.pid; exit 0", adminPassword: adminPassword)
+        runSudoCommand("kill -9 \(pid) 2>/dev/null; rm -f /tmp/quickbar_shutdown.sh; exit 0", adminPassword: adminPassword)
     }
+
+    func toggleDarkMode() -> Result<String, Error> {
+        runAppleScript("tell application \"System Events\" to tell appearance preferences to set dark mode to not dark mode")
+    }
+
+    func restartFinder() -> Result<String, Error> {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        task.arguments = ["Finder"]
+
+        let errPipe = Pipe()
+        task.standardError = errPipe
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return .success("Finder restarted")
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    func hideAllWindows() -> Result<String, Error> {
+        runAppleScript("tell application \"System Events\" to set visible of every process whose visible is true to false")
+    }
+
+    func clearClipboard() -> Result<String, Error> {
+        NSPasteboard.general.clearContents()
+        return .success("Clipboard cleared")
+    }
+
+    // MARK: - Process Monitor
 
     func getGroupedProcesses() -> [ProcessGroup] {
         let task = Process()
@@ -326,13 +282,9 @@ class QuickBarServices {
         let cmd = process.command
         let lowerCmd = cmd.lowercased()
 
-        // Skip kernel threads and very short commands
         if cmd.hasPrefix("[") || cmd.count < 3 { return nil }
-
-        // Skip ps itself and QuickBar
         if cmd.contains("QuickBar") || lowerCmd.contains("/bin/ps") { return nil }
 
-        // Skip all macOS system processes
         let systemPaths = [
             "/System/",
             "/usr/",
@@ -347,12 +299,10 @@ class QuickBarServices {
             if cmd.hasPrefix(path) { return nil }
         }
 
-        // Skip Apple system daemons and agents
         if lowerCmd.contains("com.apple.") && !cmd.contains("/Applications/") && !cmd.contains("/Users/") {
             return nil
         }
 
-        // Skip known critical system processes by name
         let criticalProcesses = [
             "launchd", "kernel", "kernel_task", "kextd", "fseventsd",
             "sysmond", "logd", "reportcrash", "coresymbolicationd",
@@ -378,7 +328,6 @@ class QuickBarServices {
             if processName == critical.lowercased() { return nil }
         }
 
-        // Only include user-facing processes
         if cmd.contains("/Applications/") || cmd.contains("/Users/") || cmd.contains("/Library/") {
             return ProcessInfo(
                 pid: process.pid,
@@ -392,7 +341,6 @@ class QuickBarServices {
             )
         }
 
-        // Include processes with significant resource usage that aren't system processes
         if process.cpu > 5.0 || process.memory > 2.0 {
             return ProcessInfo(
                 pid: process.pid,
@@ -413,17 +361,13 @@ class QuickBarServices {
         let url = URL(fileURLWithPath: command)
         var name = url.lastPathComponent
 
-        // Remove common prefixes
         if name.hasPrefix("com.apple.") {
             name = String(name.dropFirst("com.apple.".count))
         }
 
-        // Convert camelCase or dot.separated to readable
         name = name.replacingOccurrences(of: ".", with: " ")
         name = name.replacingOccurrences(of: "-", with: " ")
         name = name.replacingOccurrences(of: "_", with: " ")
-
-        // Capitalize first letter of each word
         name = name.capitalized
 
         return name
@@ -489,21 +433,10 @@ class QuickBarServices {
             }
         }
 
-        if command.contains("/Applications/") {
-            return "User application"
-        }
-
-        if command.contains("/Users/") {
-            return "User process"
-        }
-
-        if command.contains("/System/") {
-            return "System service"
-        }
-
-        if command.contains("/usr/") {
-            return "Unix utility"
-        }
+        if command.contains("/Applications/") { return "User application" }
+        if command.contains("/Users/") { return "User process" }
+        if command.contains("/System/") { return "System service" }
+        if command.contains("/usr/") { return "Unix utility" }
 
         return "Background process"
     }

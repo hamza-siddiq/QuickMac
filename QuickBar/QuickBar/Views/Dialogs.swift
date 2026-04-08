@@ -10,7 +10,13 @@ struct PasswordPromptView: View {
         VStack(spacing: 16) {
             Image(systemName: "lock.shield")
                 .font(.system(size: 32))
-                .foregroundColor(.secondary)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
 
             Text("Admin Password")
                 .font(.headline)
@@ -55,6 +61,8 @@ struct KillAppPickerView: View {
     let onQuit: (NSRunningApplication) -> Void
     let onCancel: () -> Void
 
+    @State private var hoveredApp: String?
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -62,42 +70,49 @@ struct KillAppPickerView: View {
                     .font(.headline)
                 Spacer()
                 Button(action: onCancel) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.secondary)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .font(.system(size: 16))
                 }
                 .buttonStyle(.plain)
             }
             .padding()
 
-            Divider()
+            Divider().opacity(0.4)
 
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: 2) {
                     ForEach(apps, id: \.bundleIdentifier) { app in
                         Button(action: { onQuit(app) }) {
                             HStack(spacing: 10) {
                                 if let icon = app.icon {
                                     Image(nsImage: icon)
                                         .resizable()
-                                        .frame(width: 20, height: 20)
+                                        .frame(width: 24, height: 24)
                                 }
                                 Text(app.localizedName ?? "Unknown")
                                     .font(.system(size: 13))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 Image(systemName: "xmark.circle")
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(.red.opacity(0.7))
                                     .font(.system(size: 14))
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(hoveredApp == app.bundleIdentifier ? .red.opacity(0.06) : .clear)
+                            )
                         }
                         .buttonStyle(.plain)
                         .contentShape(Rectangle())
-
-                        Divider()
-                            .padding(.horizontal, 12)
+                        .onHover { hovering in
+                            hoveredApp = hovering ? app.bundleIdentifier : nil
+                        }
                     }
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
             }
             .frame(height: 300)
         }
@@ -111,35 +126,49 @@ struct LargeFilesView: View {
     let files: [LargeFile]
     let onDismiss: () -> Void
 
+    var totalSize: String {
+        let total = files.reduce(Int64(0)) { $0 + $1.size }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: total)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Large Files (\(files.count))")
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Large Files")
+                        .font(.headline)
+                    Text("\(files.count) files using \(totalSize)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
                 Spacer()
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.secondary)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .font(.system(size: 16))
                 }
                 .buttonStyle(.plain)
             }
             .padding()
 
-            Divider()
+            Divider().opacity(0.4)
 
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: 2) {
                     ForEach(Array(files.enumerated()), id: \.element.id) { _, file in
                         HStack(spacing: 10) {
-                            Image(systemName: "doc")
+                            Image(systemName: fileIcon(for: file.name))
                                 .foregroundColor(.secondary)
                                 .frame(width: 20)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(file.name)
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 12, weight: .medium))
                                     .lineLimit(1)
-                                Text(file.url.path)
+                                Text(file.url.deletingLastPathComponent().path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))
                                     .font(.system(size: 10))
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)
@@ -148,8 +177,8 @@ struct LargeFilesView: View {
                             Spacer()
 
                             Text(file.sizeFormatted)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.secondary)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(file.size > 1_000_000_000 ? .orange : .secondary)
 
                             Button("Reveal") {
                                 NSWorkspace.shared.activateFileViewerSelecting([file.url])
@@ -159,11 +188,14 @@ struct LargeFilesView: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-
-                        Divider()
-                            .padding(.horizontal, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(.secondary.opacity(0.03))
+                        )
                     }
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
             }
             .frame(height: 350)
         }
@@ -171,103 +203,19 @@ struct LargeFilesView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
-}
 
-struct ForceEjectView: View {
-    let volumes: [String]
-    let onEject: (String) -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Force Eject Drives")
-                    .font(.headline)
-                Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding()
-
-            Divider()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(volumes.enumerated()), id: \.element) { _, volume in
-                        HStack(spacing: 10) {
-                            Image(systemName: "externaldrive")
-                                .foregroundColor(.secondary)
-                                .frame(width: 20)
-
-                            Text(volume)
-                                .font(.system(size: 13))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-
-                            Button("Eject") {
-                                onEject(volume)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-
-                        Divider()
-                            .padding(.horizontal, 12)
-                    }
-                }
-            }
-            .frame(height: 200)
+    private func fileIcon(for name: String) -> String {
+        let ext = (name as NSString).pathExtension.lowercased()
+        switch ext {
+        case "mp4", "mov", "avi", "mkv": return "film"
+        case "zip", "rar", "7z", "tar", "gz": return "doc.zipper"
+        case "dmg", "iso", "img": return "opticaldisc"
+        case "pdf": return "doc.text"
+        case "jpg", "jpeg", "png", "heic", "gif": return "photo"
+        case "mp3", "wav", "aac", "flac": return "music.note"
+        case "app": return "app"
+        default: return "doc"
         }
-        .frame(width: 320, height: 300)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-struct QuarantinePickerView: View {
-    let onPick: (URL) -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "shield.slash")
-                .font(.system(size: 32))
-                .foregroundColor(.secondary)
-
-            Text("Remove Quarantine")
-                .font(.headline)
-
-            Text("Select the app or file blocked by Gatekeeper")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button("Choose File...") {
-                let panel = NSOpenPanel()
-                panel.canChooseFiles = true
-                panel.canChooseDirectories = true
-                panel.allowsMultipleSelection = false
-                panel.prompt = "Select"
-
-                if panel.runModal() == .OK, let url = panel.url {
-                    onPick(url)
-                }
-            }
-            .buttonStyle(.borderedProminent)
-
-            Button("Cancel") {
-                onDismiss()
-            }
-            .buttonStyle(.plain)
-        }
-        .padding()
-        .frame(width: 280)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -277,19 +225,19 @@ struct ScheduledShutdownView: View {
     @State private var useCustom: Bool = false
     let onSchedule: (Date) -> Void
     let onDismiss: () -> Void
-    
+
     let presets = [15, 30, 45, 60, 90, 120]
-    
+
     var shutdownDate: Date {
         let minutes = useCustom ? (Int(customMinutes) ?? 30) : selectedMinutes
         return Date().addingTimeInterval(Double(max(1, minutes) * 60))
     }
-    
+
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "power.circle")
                 .font(.system(size: 32))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.red)
 
             Text("Schedule Shutdown")
                 .font(.headline)
@@ -298,7 +246,7 @@ struct ScheduledShutdownView: View {
                 Text("Shut down in")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
-                
+
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
                     ForEach(presets, id: \.self) { mins in
                         Button(action: { selectedMinutes = mins; useCustom = false }) {
@@ -312,27 +260,38 @@ struct ScheduledShutdownView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                             .background(
-                                selectedMinutes == mins && !useCustom
-                                    ? Color.accentColor.opacity(0.15)
-                                    : Color(nsColor: .controlBackgroundColor)
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(
+                                        selectedMinutes == mins && !useCustom
+                                            ? Color.accentColor.opacity(0.15)
+                                            : Color(nsColor: .controlBackgroundColor)
+                                    )
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(
+                                        selectedMinutes == mins && !useCustom
+                                            ? Color.accentColor.opacity(0.3)
+                                            : .clear,
+                                        lineWidth: 1
+                                    )
+                            )
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                
+
                 HStack(spacing: 8) {
                     Toggle("Custom", isOn: $useCustom)
                         .toggleStyle(.switch)
                         .scaleEffect(0.8)
-                    
+
                     TextField("Minutes", text: $customMinutes)
                         .textFieldStyle(.roundedBorder)
                         .disabled(!useCustom)
                 }
             }
-            
+
             Text("Shutdown at \(formattedTime)")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
@@ -354,7 +313,7 @@ struct ScheduledShutdownView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
-    
+
     private var formattedTime: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
@@ -366,14 +325,14 @@ struct CancelShutdownView: View {
     let scheduledTime: Date
     let onCancel: () -> Void
     let onDismiss: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "power.circle")
                 .font(.system(size: 32))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.red)
 
-            Text("Cancel Scheduled Shutdown")
+            Text("Cancel Shutdown?")
                 .font(.headline)
 
             Text("Your Mac is scheduled to shut down at \(formattedTime)")
@@ -391,6 +350,7 @@ struct CancelShutdownView: View {
                     onCancel()
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(.red)
             }
         }
         .padding()
@@ -398,7 +358,7 @@ struct CancelShutdownView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
-    
+
     private var formattedTime: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
@@ -424,8 +384,9 @@ struct ProcessMonitorView: View {
                 }
                 .buttonStyle(.plain)
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.secondary)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .font(.system(size: 16))
                 }
                 .buttonStyle(.plain)
             }
@@ -440,9 +401,13 @@ struct ProcessMonitorView: View {
                     .font(.system(size: 12))
             }
             .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.secondary.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 12)
             .padding(.bottom, 8)
 
-            Divider()
+            Divider().opacity(0.4)
 
             if isLoading {
                 VStack {
@@ -453,11 +418,11 @@ struct ProcessMonitorView: View {
                 .frame(height: 400)
             } else {
                 ScrollView {
-                    VStack(spacing: 0) {
+                    VStack(spacing: 2) {
                         ForEach(Array(filteredGroups.enumerated()), id: \.element.id) { _, group in
                             HStack(spacing: 10) {
                                 Image(systemName: group.category.icon)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(group.category.color)
                                     .font(.system(size: 14))
                                     .frame(width: 22)
 
@@ -466,18 +431,18 @@ struct ProcessMonitorView: View {
                                         Text(group.name)
                                             .font(.system(size: 13, weight: .medium))
                                             .lineLimit(1)
-                                        
+
                                         if group.count > 1 {
-                                            Text("×\(group.count)")
+                                            Text("\u{00D7}\(group.count)")
                                                 .font(.system(size: 9, weight: .medium))
                                                 .foregroundColor(.secondary)
                                                 .padding(.horizontal, 4)
                                                 .padding(.vertical, 1)
-                                                .background(.secondary.opacity(0.1))
+                                                .background(.secondary.opacity(0.08))
                                                 .clipShape(Capsule())
                                         }
                                     }
-                                    
+
                                     Text(group.description)
                                         .font(.system(size: 10))
                                         .foregroundColor(.secondary)
@@ -493,16 +458,16 @@ struct ProcessMonitorView: View {
                                             .foregroundColor(.secondary)
                                         Text("\(group.totalCPU, specifier: "%.1f")%")
                                             .font(.system(size: 11, weight: .medium))
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(group.totalCPU > 50 ? .orange : .secondary)
                                     }
-                                    
+
                                     VStack(spacing: 1) {
                                         Text("MEM")
                                             .font(.system(size: 8, weight: .medium))
                                             .foregroundColor(.secondary)
                                         Text("\(group.totalMemory, specifier: "%.1f")%")
                                             .font(.system(size: 11, weight: .medium))
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(group.totalMemory > 10 ? .orange : .secondary)
                                     }
 
                                     Button("Kill") {
@@ -517,11 +482,14 @@ struct ProcessMonitorView: View {
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-
-                            Divider()
-                                .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(.secondary.opacity(0.03))
+                            )
                         }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                 }
                 .frame(height: 400)
             }
